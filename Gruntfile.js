@@ -2,16 +2,19 @@
  * grunt-watch-exec
  * https://github.com/sqm/grunt-watch-exec
  *
- * Copyright (c) 2015 Gale Shafer
+ * Copyright (c) 2015 Squaremouth
  * Licensed under the MIT license.
  */
 
 'use strict';
 
 module.exports = function(grunt) {
-
-  // Project configuration.
   grunt.initConfig({
+    // Before generating any new files, remove any previously-created files.
+    clean: {
+      tests: ['tmp']
+    },
+
     jshint: {
       all: [
         'Gruntfile.js',
@@ -23,35 +26,22 @@ module.exports = function(grunt) {
       }
     },
 
-    // Before generating any new files, remove any previously-created files.
-    clean: {
-      tests: ['tmp']
-    },
-
-    // Configuration to be run (and then tested).
-    watch_exec: {
-      default_options: {
-        options: {
-        },
-        files: {
-          'tmp/default_options': ['test/fixtures/testing', 'test/fixtures/123']
-        }
-      },
-      custom_options: {
-        options: {
-          separator: ': ',
-          punctuation: ' !!!'
-        },
-        files: {
-          'tmp/custom_options': ['test/fixtures/testing', 'test/fixtures/123']
-        }
-      }
-    },
-
-    // Unit tests.
     nodeunit: {
       tests: ['test/*_test.js']
     }
+
+    // Configuration to be tested
+    watch_exec: {
+      echo: {
+        command: 'echo',
+        files: {
+          '+(app|lib)/**/*.rb': function(filepath) {
+            return 'spec/' + filepath.slice(0, -3) + '_spec.rb';
+          },
+          'spec/**/*.rb': true
+        }
+      }
+    },
 
   });
 

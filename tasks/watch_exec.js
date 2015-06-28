@@ -2,49 +2,64 @@
  * grunt-watch-exec
  * https://github.com/sqm/grunt-watch-exec
  *
- * Copyright (c) 2015 Gale Shafer
+ * Copyright (c) 2015 Squaremouth
  * Licensed under the MIT license.
  */
 
 'use strict';
 
+var exec = require('child_process').exec;
+var Gaze = require('gaze').Gaze;
+var watchers = [];
+
 module.exports = function(grunt) {
+  var _ = grunt.util._;
 
-  // Please see the Grunt documentation for more information regarding task
-  // creation: http://gruntjs.com/creating-tasks
+  grunt.registerTask('watch_exec', 'Run configured commands whenever watched files change.', function() {
+    var self = this,
+        done = this.async();
 
-  grunt.registerMultiTask('watch_exec', 'Run configured commands whenever watched files change.', function() {
-    // Merge task-specific and/or target-specific options with these defaults.
-    var options = this.options({
-      punctuation: '.',
-      separator: ', '
+    // Close any previously opened watchers
+    watchers.forEach(function(watcher) {
+      watcher.close();
+    });
+    watchers = [];
+
+    _.each(grunt.config('watch_exec'), function(options, target, config) {
+      var params = [],
+          patterns = _.keys(options.files);
+
+      var process = _.debounce(function() {
+        var command = options.command + ' ' + params.join(' '),
+            process = exec(command);
+
+        params = [];
+
+        process.stdout.on('data', function(d) { grunt.log.write(d); });
+        process.stderr.on('data', function(d) { grunt.log.error(d); });
+      }, 300);
+
+      patterns.forEach(function(pattern) {
+        watchers.push(new Gaze(pattern, function(err) {
+          this.on('all', function(status, filepath) {
+            if (filepath === '') {
+              return;
+            }
+
+            var translator = options.files[pattern];
+            params.push(typeof translator === 'function' ? translator(filepath) : filepath);
+
+            process();
+          });
+
+          this.on('error', function(watcherError) {
+            if (typeof watcherError === 'string') { watcherError = new Error(watcherError); }
+            grunt.log.error(watcherError.message);
+          });
+        }));
+      });
+
     });
 
-    // Iterate over all specified file groups.
-    this.files.forEach(function(f) {
-      // Concat specified files.
-      var src = f.src.filter(function(filepath) {
-        // Warn on and remove invalid source files (if nonull was set).
-        if (!grunt.file.exists(filepath)) {
-          grunt.log.warn('Source file "' + filepath + '" not found.');
-          return false;
-        } else {
-          return true;
-        }
-      }).map(function(filepath) {
-        // Read file source.
-        return grunt.file.read(filepath);
-      }).join(grunt.util.normalizelf(options.separator));
-
-      // Handle options.
-      src += options.punctuation;
-
-      // Write the destination file.
-      grunt.file.write(f.dest, src);
-
-      // Print a success message.
-      grunt.log.writeln('File "' + f.dest + '" created.');
-    });
   });
-
 };
